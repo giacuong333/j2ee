@@ -2,28 +2,30 @@ import apiInstance from "../../Config/api";
 
 const baseURL = process.env.REACT_APP_API;
 
-class ServiceService {
-	 // Lấy danh sách tất cả dịch vụ
-	 static getAllServices = async () => {
-		return await apiInstance.get(`${baseURL}/services/ListServices`, {
+class ProductService {
+
+    
+    static getAllbyStoreId = async () => {
+        return await apiInstance.get(`${baseURL}/products/ListProducts`, {
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+    };
+
+	// Lấy tất cả danh mục sản phẩm
+	static getAllCategories = async () => {
+		return await apiInstance.get(`${baseURL}/categories`, {
 			headers: {
 				"Content-Type": "application/json",
 			},
 		});
 	};
-
-	static getAllCategories = async () => {
-		return await apiInstance.get(`${baseURL}/categoryOfServices`, {
-			headers: {
-				"Content-Type": "application/json",
-			},
-		});
-	}
-
-	// Tạo sản phẩm
-	static createService = async (payload) => {
+    
+	 // Tạo sản phẩm
+	 static createProduct = async (payload) => {
         try {
-            return await apiInstance.post(`${baseURL}/services`, payload, {
+            return await apiInstance.post(`${baseURL}/products`, payload, {
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -38,9 +40,9 @@ class ServiceService {
         }
     };
 
-	 // Cập nhật sản phẩm
-	 static updateService = async (serviceId, payload) => {
-        return await apiInstance.put(`${baseURL}/services/${serviceId}`, payload, {
+    // Cập nhật sản phẩm
+    static updateProduct = async (productId, payload) => {
+        return await apiInstance.put(`${baseURL}/products/${productId}`, payload, {
             headers: {
                 "Content-Type": "application/json",
             },
@@ -48,8 +50,8 @@ class ServiceService {
     };
 
     // Xóa sản phẩm
-    static deleteService = async (serviceId) => {
-        return await apiInstance.delete(`${baseURL}/services/${serviceId}`, {
+    static deleteProduct = async (productId) => {
+        return await apiInstance.delete(`${baseURL}/products/${productId}`, {
             headers: {
                 "Content-Type": "application/json",
             },
@@ -57,17 +59,14 @@ class ServiceService {
     };
 
     // Xóa nhiều sản phẩm
-    static deleteMultipleServices = async (serviceIds) => {
-        return await apiInstance.delete(`${baseURL}/services`, {
-            data: serviceIds,
+    static deleteMultipleProducts = async (productIds) => {
+        return await apiInstance.delete(`${baseURL}/products`, {
+            data: productIds,
             headers: {
                 "Content-Type": "application/json",
             },
         });
     };
-	
-	  
 
 }
-
-export default ServiceService;
+export default ProductService;

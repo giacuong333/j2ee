@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.CascadeType;
 import lombok.Data;
 
 @Entity(name = "products")
@@ -27,6 +28,8 @@ public class ProductEntity {
     private Double old_price;
 
     private Double price;
+
+    private Double weight;
 
     private Integer stock_quantity;
 

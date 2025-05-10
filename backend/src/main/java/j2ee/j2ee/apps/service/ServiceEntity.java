@@ -35,4 +35,6 @@ public class ServiceEntity {
     @ManyToOne
     @JoinColumn(name = "category_of_service_id", referencedColumnName = "id")
     private CategoryOfServiceEntity category_of_service;
+
+    
 }

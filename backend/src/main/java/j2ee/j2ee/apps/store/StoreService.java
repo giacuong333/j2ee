@@ -35,6 +35,32 @@ public class StoreService {
         return Optional.ofNullable(store);
     }
 
+    public Optional<StoreEntity> getStoreByUserId(Long userId) {
+        return storeRepository.findStoreByUserId(userId);
+    }
+
+    public StoreEntity updateStore(Long id, StoreEntity updatedStore) {
+        // Kiểm tra xem store có tồn tại không
+        Optional<StoreEntity> existingStoreOptional = storeRepository.findById(id);
+        if (existingStoreOptional.isEmpty()) {
+            throw new RuntimeException("Store with ID " + id + " not found");
+        }
+
+        // Lấy store hiện tại và cập nhật thông tin
+        StoreEntity existingStore = existingStoreOptional.get();
+        existingStore.setName(updatedStore.getName());
+        existingStore.setDescription(updatedStore.getDescription());
+        existingStore.setAddress(updatedStore.getAddress());
+        existingStore.setPhone(updatedStore.getPhone());
+        existingStore.setImage(updatedStore.getImage());
+        existingStore.setOpen_time(updatedStore.getOpen_time());
+        existingStore.setClose_time(updatedStore.getClose_time());
+        existingStore.setStatus(updatedStore.getStatus());
+
+        // Lưu store đã cập nhật
+        return storeRepository.save(existingStore);
+    }
+
     private StoreDTO toDTO(StoreEntity entity) {
         StoreDTO dto = StoreDTO.builder()
                 .id(entity.getId())

@@ -13,7 +13,7 @@ export const moveUserTo = (role) => {
 		case CUSTOMER.toLowerCase().trim():
 			return paths.home;
 		case OWNER.toLowerCase().trim():
-			return paths.dashboard;
+			return paths.ownerhome;
 		default:
 			return paths.home;
 	}

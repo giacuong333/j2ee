@@ -1,30 +1,73 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import DataTable from "react-data-table-component";
 import axios from "axios";
+import StoreService from "../../../Services/store";
+import { showToast } from "../../../Components/Toast/index.jsx";
+import { FaRegEdit } from "react-icons/fa";
 
+
+const Loading = React.lazy(() => import("../../../Components/Loading/index.jsx"));
+const Form = React.lazy(() => import("./Form/index.jsx"));
 const StoreOwner = () => {
-  const [storeData, setStoreData] = useState([]); // State để lưu dữ liệu store
-  const [loading, setLoading] = useState(true); // State để quản lý trạng thái loading
-
+  const [storeData, setStoreData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editStore, setEditStore] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
   useEffect(() => {
-    const fetchStoreData = async () => {
+    const fetchStores = async () => {
       try {
-        const token = localStorage.getItem("access");
-        const response = await axios.get("http://localhost:8080/owner/store", {
-          headers: {
-            Authorization: `Bearer ${token}`, // Thêm Authorization header
-          },
-        });
-        setStoreData(response.data); // Cập nhật dữ liệu vào state
+        setLoading(true);
+        const response = await StoreService.getStoreBylogin();
+        const storeArray = [response.data];
+        setStoreData(storeArray);
       } catch (error) {
-        console.error("Error fetching store data:", error); // Xử lý lỗi nếu có
+        showToast("Lỗi khi tải danh sách", "error");
       } finally {
-        setLoading(false); // Đặt trạng thái loading thành false sau khi hoàn tất
+        setLoading(false);
       }
     };
-  
-    fetchStoreData(); // Gọi hàm để lấy dữ liệu khi component được mount
+    fetchStores();
   }, []);
+
+  useEffect(() => {
+   
+  });
+
+  const handleEdit = (store) => {
+    setEditStore(store);
+		setShowForm(true);
+  };
+
+  const handleRowsSelected = ({ selectedRow }) => {
+		setSelectedRow(selectedRow);
+	};
+
+  const handleRowClicked = (row) => {
+    setSelectedRow(row);
+};
+  const handleFormSubmit = async (newStoreData) => {
+      try {
+        if (editStore) {
+          const response = await StoreService.updateStore(editStore.id, newStoreData);
+          setStoreData(
+            storeData.map((store) =>
+              store.id === editStore.id ? response.data : store
+            )
+          );
+          showToast("Cập nhật thành công", "success");
+          console.log("Cập nhật thành công:", response.data);
+          console.log("Dữ liệu sau khi cập nhật:", storeData);
+        } 
+      } catch (error) {
+        console.error("Lỗi khi lưu:", error);
+        const errorMessage =
+          typeof error === "string"
+            ? error
+            : error.message || "Lỗi không xác định";
+        showToast(`Lỗi khi lưu: ${errorMessage}`, "error");
+      }
+    };
 
   const columns = [
     {
@@ -38,23 +81,74 @@ const StoreOwner = () => {
       sortable: true,
     },
     {
-      name: "Chủ sở hữu",
-      selector: (row) => row.ownerName,
+      name: "Số điện thoại",
+      selector: (row) => row.phone,
       sortable: true,
+    },
+    {
+      name: "Open Time",
+      selector: (row) => row.open_time,
+      sortable: true,
+    },
+    {
+      name: "Close Time",
+      selector: (row) => row.close_time,
+      sortable: true,
+    },
+    {
+      name: "Description",
+      selector: (row) => row.description,
+      sortable: true,
+    },
+    
+    {
+      name: "Actions",
+      center: true,
+      cell: (row) => (
+        <div className="flex gap-2">
+          <FaRegEdit
+            className="cursor-pointer"
+            size={18}
+            onClick={() => handleEdit(row)}
+          />
+        </div>
+      ),
+      ignoreRowClick: true,
     },
   ];
 
   return (
-    <div>
-      <h1>Thông tin cửa hàng</h1>
+    <>
+     <div>
       <DataTable
         columns={columns}
         data={storeData}
         pagination
+        onRowClicked={handleRowClicked}
         highlightOnHover
         striped
       />
     </div>
+    
+    <Form
+				toggle={showForm}
+				setToggle={() => {
+					setShowForm(false);
+					setEditStore(null);
+				}}
+				initialData={editStore}
+				onSubmit={handleFormSubmit}
+				isDisabled={false}
+			/>
+
+			<Form
+				toggle={!!selectedRow}
+				setToggle={() => setSelectedRow(null)}
+				initialData={selectedRow}
+				onSubmit={() => {}}
+				isDisabled={true}
+			/>
+    </>
   );
 };
 

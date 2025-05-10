@@ -8,14 +8,22 @@ class StoreService {
 		return await apiInstance.get(`${baseURL}/stores`);
 	};
 
-	// // Lấy Store  theo ID
-	// getStoreById = async (roleId) => {
-	// 	return await apiInstance.get(`${baseURL}/stores/${roleId}`, {
-	// 		headers: {
-	// 			"Content-Type": "application/json",
-	// 		},
-	// 	});
-	// };
+	// Lấy Store  theo ID
+	getStoreById = async (roleId) => {
+		return await apiInstance.get(`${baseURL}/stores/${roleId}`, {
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	};
+
+	static getStoreBylogin = async () => {
+		return await apiInstance.get(`${baseURL}/stores/mystore`, {
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	}
 
 	// // Tạo Store  mới
 	// createStore = async (payload) => {
@@ -26,14 +34,14 @@ class StoreService {
 	// 	});
 	// };
 
-	// // Cập nhật Store
-	// updateStore = async (storeId, payload) => {
-	// 	return await apiInstance.put(`${baseURL}/stores/${storeId}`, payload, {
-	// 		headers: {
-	// 			"Content-Type": "application/json",
-	// 		},
-	// 	});
-	// };
+	// Cập nhật Store
+	static updateStore = async (storeId, payload) => {
+		return await apiInstance.put(`${baseURL}/stores/${storeId}`, payload, {
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	};
 
 	// // Xóa một Store
 	// deleteStore = async (storeId) => {
