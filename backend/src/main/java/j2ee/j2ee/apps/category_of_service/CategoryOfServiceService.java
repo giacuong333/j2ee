@@ -43,9 +43,11 @@ public class CategoryOfServiceService {
     @Transactional
     public CategoryOfServiceDTO createCategory(CategoryOfServiceDTO categoryOSDTO, MultipartFile multipartFile) throws IOException {
         CategoryOfServiceEntity entity = toEntity(categoryOSDTO);
-        entity.setImageName(multipartFile.getOriginalFilename());
-        entity.setImageType(multipartFile.getContentType());
-        entity.setImage(multipartFile.getBytes());
+        if (multipartFile != null && !multipartFile.isEmpty()) {
+            entity.setImageName(multipartFile.getOriginalFilename());
+            entity.setImageType(multipartFile.getContentType());
+            entity.setImage(multipartFile.getBytes());
+        }
         CategoryOfServiceEntity savedEntity = categoryRepository.save(entity);
         return toDTO(savedEntity);
     }

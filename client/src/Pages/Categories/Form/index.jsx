@@ -9,28 +9,41 @@ const Overlay = React.lazy(() => import("../../../Components/Overlay"));
 const Loading = React.lazy(() => import("../../../Components/Loading"));
 
 const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) => {
-  const [fields, setFields] = useState({ name: "", status: "" });
+  const [fields, setFields] = useState({ name: "", status: "", image: null });
   const [file, setFile] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [pending, setPending] = useState(false);
 
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; 
 
   useEffect(() => {
     if (initialData) {
       setFields({
         name: initialData.name || "",
         status: initialData.status || "",
+        image: null,
       });
-      setPreviewImage(initialData.imageUrl || null);
-      setFile(null);
       setErrors({});
+      if (initialData.id) {
+        CategoryOfServiceService.getCategoryOSImage(initialData.id)
+          .then((response) => {
+            const url = URL.createObjectURL(response.data);
+            setImagePreview(url);
+          })
+          .catch((error) => {
+            console.error("Failed to load image:", error);
+            setImagePreview("../../../../src/assets/categoryOfService/default.jpg");
+          });
+      }
     } else {
-      setFields({ name: "", status: "" });
-      setPreviewImage(null);
-      setFile(null);
+      setFields({ name: "", status: "", image: null });
       setErrors({});
+      setImagePreview(null);
     }
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
   }, [initialData]);
 
   const handleFieldsChange = (key, value) => {
@@ -43,8 +56,15 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
   const handleFileChange = (e) => {
     if (!isDisabled && e.target.files[0]) {
       const selectedFile = e.target.files[0];
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        showToast("Image size exceeds 5MB. Please select a smaller image.", "error");
+        setErrors((prev) => ({ ...prev, image: "Image size too large" }));
+        setFile(null);
+        setImagePreview(null);
+        return;
+      }
       setFile(selectedFile);
-      setPreviewImage(URL.createObjectURL(selectedFile));
+      setImagePreview(URL.createObjectURL(selectedFile));
       setErrors((prev) => ({ ...prev, image: "" }));
     }
   };
@@ -69,6 +89,9 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     if (isEmpty(fields.status)) {
       newErrors.status = "Status is required";
     }
+    if (file && file.size > MAX_FILE_SIZE) {
+      newErrors.image = "Image size exceeds 5MB";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -84,44 +107,32 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
         status: fields.status,
       };
 
-   
-      const submitData = { categoryDTO, imageFile: file };
-
-   
       let response;
       if (initialData) {
         response = await CategoryOfServiceService.updateCategoryOfServices(
           initialData.id,
-          submitData.categoryDTO,
-          submitData.imageFile
+          categoryDTO,
+          file
         );
       } else {
         response = await CategoryOfServiceService.createCategoryOfServices(
-          submitData.categoryDTO,
-          submitData.imageFile
+          categoryDTO,
+          file
         );
       }
 
       if (response && response.data) {
- 
-        try {
-          const imageResponse = await CategoryOfServiceService.getCategoryOSImage(response.data.id);
-          response.data.imageUrl = URL.createObjectURL(imageResponse.data);
-        } catch (error) {
-          response.data.imageUrl = null;
-        }
         onSubmit(response.data);
-        showToast(initialData ? "Updated successfully" : "Created successfully", "success");
+        // showToast(
+        //   initialData ? "Cập nhật thành công" : "Tạo thành công",
+        //   "success"
+        // );
         setToggle(false);
       }
     } catch (error) {
-      console.error("Error saving category:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
+      console.error("Lỗi khi lưu:", error);
       showToast(
-        `Error saving category: ${error.response?.data?.message || error.message}`,
+        "Image không phù hợp.Vui lòng chọn ảnh khác! " ,
         "error"
       );
     } finally {
@@ -145,18 +156,20 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
           <div className="flex items-center justify-between w-full mb-4">
             <p className="font-semibold text-lg">
               {isDisabled
-                ? "Category Information"
+                ? "Thông tin danh mục"
                 : initialData
-                ? "Edit Category"
-                : "Create Category"}
+                ? "Chỉnh sửa danh mục"
+                : "Tạo danh mục"}
             </p>
-            <IoClose size={26} className="cursor-pointer" onClick={setToggle} />
+            <IoClose size={26} className="cursor-pointer" onClick={() => setToggle(false)} />
           </div>
 
           <div className="space-y-4">
             {!isDisabled && (
               <div>
-                <label className="block mb-1 font-serif font-medium">Category Image</label>
+                <label className="block mb-1 font-serif font-medium">
+                  Ảnh danh mục
+                </label>
                 <input
                   type="file"
                   accept="image/*"
@@ -170,17 +183,15 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               </div>
             )}
 
-            {previewImage && (
+            {imagePreview && (
               <div className="mt-4">
-                <label className="block mb-1 font-serif font-medium">Image Preview</label>
+                <label className="block mb-1 font-serif font-medium">
+                  Xem trước ảnh
+                </label>
                 <img
-                  src={previewImage}
+                  src={imagePreview}
                   alt={fields.name || "Category Image"}
                   className="w-32 h-32 object-cover rounded-md"
-                  onError={(e) => {
-                    e.target.src = "/src/assets/categoryOfService/default.jpg";
-                    console.error("Image not found:", previewImage);
-                  }}
                 />
               </div>
             )}
@@ -226,8 +237,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               disabled={isDisabled}
               options={[
                 { value: "", label: "Choose status" },
-                { value: "active", label: "Active" },
-                { value: "inactive", label: "Inactive" },
+                { value: "1", label: "Active" },
+                { value: "2", label: "Inactive" },
               ]}
             />
           </div>
@@ -238,7 +249,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 <button
                   type="button"
                   className="transition-all duration-700 text-black w-full py-2 rounded font-serif font-semibold bg-gray-200 hover:bg-gray-300"
-                  onClick={setToggle}
+                  onClick={() => setToggle(false)}
                   disabled={pending}
                 >
                   Cancel
@@ -251,7 +262,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                   {pending ? (
                     <Loading customStyle="flex items-center justify-center" />
                   ) : (
-                    <p>{initialData ? "Update" : "Create"}</p>
+                    <p>{initialData ? "Cập nhật" : "Tạo"}</p>
                   )}
                 </button>
               </>

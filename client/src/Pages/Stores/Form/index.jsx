@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import { isEmpty } from "../../../Utils/validation";
 import { IoClose } from "react-icons/io5";
 import { showToast } from "../../../Components/Toast";
@@ -21,10 +21,12 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     status: "",
   });
   const [file, setFile] = useState(null);
-  const [imageUrl, setImageUrl] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [pending, setPending] = useState(false);
   const [owners, setOwners] = useState([]);
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; 
 
   useEffect(() => {
     if (initialData) {
@@ -40,7 +42,19 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
       });
       setErrors({});
       if (initialData.id) {
-        fetchImage(initialData.id);
+        StoreService.getStoreImage(initialData.id)
+          .then((response) => {
+            const url = URL.createObjectURL(response.data);
+            setImagePreview(url);
+          })
+          .catch((error) => {
+            if (error.response?.status === 401) {
+              console.warn(`Unauthorized access to image for store ${initialData.id}`);
+            } else {
+              console.error("Failed to load store image:", error.response?.data || error.message);
+            }
+            setImagePreview("/assets/images/store/default.jpg");
+          });
       }
     } else {
       setFields({
@@ -54,9 +68,13 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
         status: "",
       });
       setErrors({});
-      setImageUrl(null);
-      setFile(null);
+      setImagePreview(null);
     }
+    return () => {
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
   }, [initialData]);
 
   useEffect(() => {
@@ -66,24 +84,13 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
         const ownersData = response.data;
         setOwners(Array.isArray(ownersData) ? ownersData : []);
       } catch (error) {
-        console.error("Lỗi khi lấy danh sách chủ cửa hàng:", error);
-        showToast("Không thể tải danh sách chủ cửa hàng", "error");
+        console.error("Error fetching owners:", error.response?.data || error.message);
+        showToast("Failed to load store owners", "error");
         setOwners([]);
       }
     };
     fetchOwners();
   }, []);
-
-  const fetchImage = async (storeId) => {
-    try {
-      const response = await StoreService.getStoreImage(storeId);
-      const url = URL.createObjectURL(response.data);
-      setImageUrl(url);
-    } catch (error) {
-      console.error("Lỗi khi lấy ảnh:", error);
-      showToast("Không thể tải ảnh cửa hàng", "error");
-    }
-  };
 
   const handleFieldsChange = (key, value) => {
     if (!isDisabled) {
@@ -95,27 +102,15 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
   const handleFileChange = (e) => {
     if (!isDisabled && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      const validTypes = ["image/png", "image/jpeg", "image/jpg"];
-      setErrors((prev) => ({ ...prev, image: "" }));
-      if (!validTypes.includes(selectedFile.type)) {
-        setErrors((prev) => ({
-          ...prev,
-          image: "Chỉ hỗ trợ file PNG, JPG, JPEG",
-        }));
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        showToast("Image size exceeds 5MB. Please select a smaller image.", "error");
+        setErrors((prev) => ({ ...prev, image: "Image size too large" }));
         setFile(null);
-        setImageUrl(null);
-        return;
-      }
-      
-      if (selectedFile.size > 1 * 1024 * 1024) {
-        setErrors((prev) => ({
-          ...prev,
-          image: "File không được lớn hơn 1MB",
-        }));
+        setImagePreview(null);
         return;
       }
       setFile(selectedFile);
-      setImageUrl(URL.createObjectURL(selectedFile));
+      setImagePreview(URL.createObjectURL(selectedFile));
       setErrors((prev) => ({ ...prev, image: "" }));
     }
   };
@@ -132,6 +127,14 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     }
   };
 
+  const validatePhone = (phone) => {
+    if (isEmpty(phone)) return "Phone number is required";
+    const phoneRegex = /^\d+$/;
+    if (!phoneRegex.test(phone)) return "Phone number must contain only digits";
+    if (phone.length !== 10) return "Phone number must be exactly 10 digits";
+    return "";
+  };
+
   const validateForm = () => {
     let newErrors = {};
     if (isEmpty(fields.name)) newErrors.name = "Name is required";
@@ -142,24 +145,13 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     if (isEmpty(fields.closeTime)) newErrors.closeTime = "Closing time is required";
     if (isEmpty(fields.ownerId)) newErrors.ownerId = "Store owner is required";
     if (isEmpty(fields.status)) newErrors.status = "Status is required";
-
     if (fields.phone) {
-      const phoneRegex = /^\d+$/;
-      if (!phoneRegex.test(fields.phone)) {
-        newErrors.phone = "Phone number must contain only digits";
-      } else if (fields.phone.length !== 10) {
-        newErrors.phone = "Phone number must be exactly 10 digits";
-      }
+      const phoneError = validatePhone(fields.phone);
+      if (phoneError) newErrors.phone = phoneError;
     }
-
-    if (fields.openTime && fields.closeTime) {
-      const open = new Date(`1970-01-01T${fields.openTime}:00`);
-      const close = new Date(`1970-01-01T${fields.closeTime}:00`);
-      if (open >= close) {
-        newErrors.closeTime = "Closing time must be after opening time";
-      }
+    if (file && file.size > MAX_FILE_SIZE) {
+      newErrors.image = "Image size exceeds 5MB";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -170,7 +162,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
 
     setPending(true);
     try {
-      const storeData = {
+      const data = {
         name: fields.name,
         description: fields.description,
         address: fields.address,
@@ -183,25 +175,23 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
 
       let response;
       if (initialData) {
-        response = await StoreService.updateStore(initialData.id, storeData, file);
+        response = await StoreService.updateStore(initialData.id, data, file);
       } else {
-        if (!file) {
-          showToast("Please select a store image", "error");
-          setPending(false);
-          return;
-        }
-        response = await StoreService.createStore(storeData, file);
+        response = await StoreService.createStore(data, file);
       }
 
       if (response && response.data) {
+      
         onSubmit(response.data);
-        showToast(initialData ? "Cập nhật thành công" : "Tạo thành công", "success");
+        // showToast(initialData ? "Updated store successfully" : "Created store successfully", "success");
         setToggle(false);
+      } else {
+        throw new Error("Invalid response from server");
       }
     } catch (error) {
-      console.error("Lỗi khi lưu:", error);
+      console.error("Error saving store:", error.response?.data || error.message);
       showToast(
-        "Lỗi khi lưu: " + (error.response?.data?.message || error.message),
+        "Failed to save store: " + (error.response?.data?.message || error.message),
         "error"
       );
     } finally {
@@ -210,7 +200,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
   };
 
   return (
-    <Suspense fallback={<Loading />}>
+    <>
       <Overlay toggle={toggle} setToggle={setToggle} />
       <section
         className={`
@@ -225,10 +215,10 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
           <div className="flex items-center justify-between w-full mb-4">
             <p className="font-semibold text-lg">
               {isDisabled
-                ? "Thông tin cửa hàng"
+                ? "Store Information"
                 : initialData
-                ? "Chỉnh sửa cửa hàng"
-                : "Tạo cửa hàng"}
+                ? "Edit Store"
+                : "Create Store"}
             </p>
             <IoClose size={26} className="cursor-pointer" onClick={() => setToggle(false)} />
           </div>
@@ -236,10 +226,10 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
           <div className="space-y-4">
             {!isDisabled && (
               <div>
-                <label className="block mb-1 font-serif font-medium">Ảnh cửa hàng</label>
+                <label className="block mb-1 font-serif font-medium">Store Image</label>
                 <input
                   type="file"
-                  accept="image/png,image/jpeg,image/jpg"
+                  accept="image/*"
                   onChange={handleFileChange}
                   className="w-full p-2 border rounded"
                   disabled={isDisabled}
@@ -250,11 +240,11 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               </div>
             )}
 
-            {imageUrl && (
+            {imagePreview && (
               <div className="mt-4">
-                <label className="block mb-1 font-serif font-medium">Xem trước ảnh</label>
+                <label className="block mb-1 font-serif font-medium">Image Preview</label>
                 <img
-                  src={imageUrl}
+                  src={imagePreview}
                   alt={fields.name || "Store Image"}
                   className="w-32 h-32 object-cover rounded-md"
                 />
@@ -276,8 +266,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onBlur={() =>
                 isEmpty(fields.name) && handleFieldsBlur("name", "Name is required")
               }
-              hasError={!!errors.name}
-              errorMessage={errors.name}
+              hasError={!!errors?.name}
+              errorMessage={errors?.name}
               disabled={isDisabled}
             />
 
@@ -298,8 +288,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 handleFieldsBlur("description", "Description is required")
               }
               disabled={isDisabled}
-              hasError={!!errors.description}
-              errorMessage={errors.description}
+              hasError={!!errors?.description}
+              errorMessage={errors?.description}
             />
 
             <FormControl
@@ -318,8 +308,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 isEmpty(fields.address) && handleFieldsBlur("address", "Address is required")
               }
               disabled={isDisabled}
-              hasError={!!errors.address}
-              errorMessage={errors.address}
+              hasError={!!errors?.address}
+              errorMessage={errors?.address}
             />
 
             <FormControl
@@ -334,12 +324,13 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               value={fields.phone}
               onChange={(event) => handleFieldsChange("phone", event.target.value)}
               onType={() => handleFieldsType("phone")}
-              onBlur={() =>
-                isEmpty(fields.phone) && handleFieldsBlur("phone", "Phone number is required")
-              }
+              onBlur={() => {
+                const phoneError = validatePhone(fields.phone);
+                if (phoneError) handleFieldsBlur("phone", phoneError);
+              }}
               disabled={isDisabled}
-              hasError={!!errors.phone}
-              errorMessage={errors.phone}
+              hasError={!!errors?.phone}
+              errorMessage={errors?.phone}
             />
 
             <FormControl
@@ -357,8 +348,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 isEmpty(fields.openTime) &&
                 handleFieldsBlur("openTime", "Opening time is required")
               }
-              hasError={!!errors.openTime}
-              errorMessage={errors.openTime}
+              hasError={!!errors?.openTime}
+              errorMessage={errors?.openTime}
               disabled={isDisabled}
             />
 
@@ -377,8 +368,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 isEmpty(fields.closeTime) &&
                 handleFieldsBlur("closeTime", "Closing time is required")
               }
-              hasError={!!errors.closeTime}
-              errorMessage={errors.closeTime}
+              hasError={!!errors?.closeTime}
+              errorMessage={errors?.closeTime}
               disabled={isDisabled}
             />
 
@@ -390,14 +381,15 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               id="ownerId"
               label="Owner"
               labelStyle="mb-1 font-serif"
-              value={fields.ownerId}
+              value={fields.ownerId || ""}
               onChange={(event) => handleFieldsChange("ownerId", event.target.value)}
               onType={() => handleFieldsType("ownerId")}
               onBlur={() =>
-                isEmpty(fields.ownerId) && handleFieldsBlur("ownerId", "Store owner is required")
+                isEmpty(fields.ownerId) &&
+                handleFieldsBlur("ownerId", "Owner is required")
               }
-              hasError={!!errors.ownerId}
-              errorMessage={errors.ownerId}
+              hasError={!!errors?.ownerId}
+              errorMessage={errors?.ownerId}
               disabled={isDisabled}
               options={[
                 { value: "", label: "Choose owner" },
@@ -420,15 +412,16 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onChange={(event) => handleFieldsChange("status", event.target.value)}
               onType={() => handleFieldsType("status")}
               onBlur={() =>
-                isEmpty(fields.status) && handleFieldsBlur("status", "Status is required")
+                isEmpty(fields.status) &&
+                handleFieldsBlur("status", "Status is required")
               }
-              hasError={!!errors.status}
-              errorMessage={errors.status}
+              hasError={!!errors?.status}
+              errorMessage={errors?.status}
               disabled={isDisabled}
               options={[
                 { value: "", label: "Choose status" },
-                { value: "active", label: "Active" },
-                { value: "inactive", label: "Inactive" },
+                { value: "1", label: "Active" },
+                { value: "2", label: "Inactive" },
               ]}
             />
           </div>
@@ -452,7 +445,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                   {pending ? (
                     <Loading customStyle="flex items-center justify-center" />
                   ) : (
-                    <p>{initialData ? "Cập nhật" : "Tạo"}</p>
+                    <p>{initialData ? "Update" : "Create"}</p>
                   )}
                 </button>
               </>
@@ -469,7 +462,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
           </div>
         </form>
       </section>
-    </Suspense>
+    </>
   );
 };
 

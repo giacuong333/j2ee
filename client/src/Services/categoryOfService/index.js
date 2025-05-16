@@ -4,20 +4,21 @@ const baseURL = process.env.REACT_APP_API;
 
 class CategoryOfServiceService {
   // Lấy tất cả Category Of Service
-  async getAllCategoryOfServices() {
+   getAllCategoryOfServices = async ()=> {
     try {
       return await apiInstance.get(`${baseURL}/categoryOfServices`, {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
     } catch (error) {
       throw new Error(`Lỗi khi lấy danh sách category: ${error.response?.data?.message || error.message}`);
     }
   }
 
+
   // Lấy Category Of Service theo ID
-  async getCategoryOfServicesById(categoryOfServiceId) {
+   getCategoryOfServicesById =  async (categoryOfServiceId) =>{
     try {
       return await apiInstance.get(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, {
         headers: {
@@ -30,7 +31,7 @@ class CategoryOfServiceService {
   }
 
   // Lấy image của Category Of Service theo ID
-  async getCategoryOSImage(categoryOfServiceId) {
+   getCategoryOSImage= async (categoryOfServiceId) => {
     try {
       return await apiInstance.get(`${baseURL}/categoryOfServices/${categoryOfServiceId}/image`, {
         responseType: "blob",
@@ -41,16 +42,17 @@ class CategoryOfServiceService {
   }
 
   // Tạo Category Of Service
-  async createCategoryOfServices(categoryOfServiceDTO, imageFile) {
+   createCategoryOfServices = async (categoryOfServiceDTO, imageFile)=> {
     try {
       const formData = new FormData();
-      if (imageFile) {
-        formData.append("imageFile", imageFile);
-      }
+
       formData.append(
         "categoryDTO",
         new Blob([JSON.stringify(categoryOfServiceDTO)], { type: "application/json" })
       );
+      if (imageFile) {
+        formData.append("imageFile", imageFile);
+      }
 
       
 
@@ -71,7 +73,7 @@ class CategoryOfServiceService {
   }
 
   // Cập nhật Category Of Service
-  async updateCategoryOfServices(id, categoryOfServiceDTO, imageFile) {
+   updateCategoryOfServices= async (id, categoryOfServiceDTO, imageFile)=>  {
     try {
       const formData = new FormData();
       formData.append(
@@ -99,7 +101,7 @@ class CategoryOfServiceService {
   }
 
   // Xóa một Category Of Service
-  async deleteCategoryOfService(categoryOfServiceId) {
+   deleteCategoryOfService  = async (categoryOfServiceId) => {
     try {
       return await apiInstance.delete(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, {
         headers: {
@@ -112,7 +114,7 @@ class CategoryOfServiceService {
   }
 
   // Xóa nhiều Category Of Service
-  async deleteMultipleCategoryOfServices(categoryOfServiceIds) {
+   deleteMultipleCategoryOfServices = async (categoryOfServiceIds) => {
     try {
       return await apiInstance.delete(`${baseURL}/categoryOfServices/delete-multiple`, {
         data: categoryOfServiceIds,

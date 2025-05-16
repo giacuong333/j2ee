@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import DataTable from "react-data-table-component";
 import { isEmpty } from "../../Utils/validation.js";
 import { CiSearch } from "react-icons/ci";
@@ -25,7 +25,7 @@ const SubHeader = ({ selectedRows, handleDeleteMultiple }) => {
   return (
     <>
       <div className="w-full p-5 bg-gray-100 flex items-center justify-between">
-        <span>{selectedRows.length} items selected</span>
+        <span>{selectedRows.length} mục được chọn</span>
         <button onClick={() => setShowConfirmDelete(true)}>
           <IoTrashOutline
             size={36}
@@ -39,8 +39,8 @@ const SubHeader = ({ selectedRows, handleDeleteMultiple }) => {
         setToggle={() => setShowConfirmDelete(false)}
         onOk={handleDeleteMultiple}
         onCancel={() => setShowConfirmDelete(false)}
-        title="Are you sure you want to delete these?"
-        message="This action cannot be undone"
+        title="Are you sure you want to delete these categories?"
+        message="This action can be undone"
         okButtonText="OK"
         cancelButtonText="Cancel"
       />
@@ -53,19 +53,32 @@ const SelectBox = React.forwardRef(({ ...props }) => {
     <input
       type="checkbox"
       {...props}
-      className="w-4 h-4 text-[#435d63] border-gray-200 rounded focus:ring-[#435d63]"
+      className="w-4 h-4 text-[#435d63] bg-[#435d63] border-gray-200 rounded focus:ring-[#435d63]"
     />
   );
 });
 
 const Categories = () => {
+  const [searchInput, setSearchInput] = useState("");
+  const [showActions, setShowActions] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [categoryOSsData, setCategoryOSsData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editCategoryOS, setEditCategoryOS] = useState(null);
+  const [showConfirmDeleteSingle, setShowConfirmDeleteSingle] = useState(false);
+  const [categoryOSIdToDelete, setCategoryOSIdToDelete] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [imageCache, setImageCache] = useState({});
+
   const columns = [
     {
       name: "Image",
       sortable: true,
       cell: (row) => (
         <img
-          src={row.imageUrl || "../../assets/images/categoryOfService/default.png"}
+          src={imageCache[row.id] || "/assets/images/categoryOfService/default.jpg"}
           alt={row.name || "Category"}
           style={{ width: "50px", height: "50px", objectFit: "cover" }}
         />
@@ -74,12 +87,12 @@ const Categories = () => {
     {
       name: "Name",
       sortable: true,
-      selector: (row) => row.name || "N/A",
+      selector: (row) => row.name,
     },
     {
       name: "Status",
       sortable: true,
-      selector: (row) => (row.status === "active" ? "Active" : "Inactive"),
+      selector: (row) => (row.status === "1" ? "Active" : "Inactive"),
     },
     {
       name: "Actions",
@@ -102,60 +115,58 @@ const Categories = () => {
     },
   ];
 
-  const [searchInput, setSearchInput] = useState("");
-  const [errors, setErrors] = useState({});
-  const [showActions, setShowActions] = useState(false);
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [categoryOSsData, setCategoryOSsData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editCategoryOS, setEditCategoryOS] = useState(null);
-  const [showConfirmDeleteSingle, setShowConfirmDeleteSingle] = useState(false);
-  const [categoryOSIdToDelete, setCategoryOSIdToDelete] = useState(null);
-  const [selectedRow, setSelectedRow] = useState(null);
-
- 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         setLoading(true);
         const response = await CategoryOfServiceService.getAllCategoryOfServices();
-        const categoriesWithImages = await Promise.all(
-          response.data.map(async (category) => {
-            try {
-              const imageResponse = await CategoryOfServiceService.getCategoryOSImage(category.id);
-              const imageUrl = URL.createObjectURL(imageResponse.data);
-              return { ...category, imageUrl };
-            } catch (error) {
-              console.error(`Error fetching image for category ${category.id}:`, error);
-              return { ...category, imageUrl: null };
-            }
-          })
-        );
-        setCategoryOSsData(categoriesWithImages);
-        setFilteredData(categoriesWithImages);
+        const categories = response.data;
+        setCategoryOSsData(categories);
+        setFilteredData(categories);
+
+      
+        const imagePromises = categories.map(async (category) => {
+          try {
+            const imageResponse = await CategoryOfServiceService.getCategoryOSImage(category.id);
+            const imageUrl = URL.createObjectURL(imageResponse.data);
+            return { id: category.id, url: imageUrl };
+          } catch (error) {
+            console.error(`Failed to load image for category ${category.id}:`, error);
+            return { id: category.id, url: "/assets/images/categoryOfService/default.jpg" };
+          }
+        });
+
+        const imageResults = await Promise.all(imagePromises);
+        const newImageCache = imageResults.reduce((acc, { id, url }) => {
+          acc[id] = url;
+          return acc;
+        }, {});
+        setImageCache(newImageCache);
       } catch (error) {
-        console.error("Error fetching categories:", error);
-        showToast("Error loading categories", "error");
+        showToast("Failed to load categories", "error");
       } finally {
         setLoading(false);
       }
     };
     fetchCategories();
-  }, []);
 
+    return () => {
+   
+      Object.values(imageCache).forEach((url) => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const filtered = categoryOSsData.filter((item) =>
-      item.name?.toLowerCase().includes(searchInput.toLowerCase())
+      item.name.toLowerCase().includes(searchInput.toLowerCase())
     );
     setFilteredData(filtered);
   }, [searchInput, categoryOSsData]);
 
   const handleFieldsChange = (key, value) => {
     setSearchInput(value);
-    setErrors((prev) => ({ ...prev, searchInput: "" }));
   };
 
   const handleRowsSelected = ({ selectedRows }) => {
@@ -165,14 +176,16 @@ const Categories = () => {
   const handleDeleteMultiple = async () => {
     const ids = selectedRows.map((row) => row.id);
     try {
+      setLoading(true);
       await CategoryOfServiceService.deleteMultipleCategoryOfServices(ids);
       setCategoryOSsData(categoryOSsData.filter((category) => !ids.includes(category.id)));
-      setFilteredData(filteredData.filter((category) => !ids.includes(category.id)));
       setSelectedRows([]);
       showToast("Deleted multiple categories successfully", "success");
     } catch (error) {
       console.error("Error deleting multiple categories:", error);
-      showToast("Error deleting multiple categories", "error");
+      showToast("Failed to delete multiple categories", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -183,14 +196,16 @@ const Categories = () => {
 
   const confirmDeleteSingle = async () => {
     try {
+      setLoading(true);
       await CategoryOfServiceService.deleteCategoryOfService(categoryOSIdToDelete);
       setCategoryOSsData(categoryOSsData.filter((category) => category.id !== categoryOSIdToDelete));
-      setFilteredData(filteredData.filter((category) => category.id !== categoryOSIdToDelete));
       setShowConfirmDeleteSingle(false);
-      showToast("Deleted successfully", "success");
+      showToast("Deleted category successfully", "success");
     } catch (error) {
       console.error("Error deleting category:", error);
-      showToast("Error deleting category", "error");
+      showToast("Failed to delete category", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -201,58 +216,48 @@ const Categories = () => {
 
   const handleFormSubmit = async (newCategoryData) => {
     try {
-      let response;
-      if (editCategoryOS) {
+      setLoading(true);
+      let imageUrl = imageCache[newCategoryData.id] || "/assets/images/categoryOfService/default.jpg";
+      
    
-        response = await CategoryOfServiceService.updateCategoryOfServices(
-          editCategoryOS.id,
-          newCategoryData.categoryDTO,
-          newCategoryData.imageFile
-        );
-        const updatedCategory = response.data;
-        try {
-          const imageResponse = await CategoryOfServiceService.getCategoryOSImage(updatedCategory.id);
-          updatedCategory.imageUrl = URL.createObjectURL(imageResponse.data);
-        } catch (error) {
-          updatedCategory.imageUrl = null;
-        }
-        setCategoryOSsData(
-          categoryOSsData.map((category) =>
-            category.id === editCategoryOS.id ? updatedCategory : category
-          )
-        );
-        setFilteredData(
-          filteredData.map((category) =>
-            category.id === editCategoryOS.id ? updatedCategory : category
-          )
-        );
-        showToast("Updated successfully", "success");
-      } else {
-     
-        response = await CategoryOfServiceService.createCategoryOfServices(
-          newCategoryData.categoryDTO,
-          newCategoryData.imageFile
-        );
-        const newCategory = response.data;
-        try {
-          const imageResponse = await CategoryOfServiceService.getCategoryOSImage(newCategory.id);
-          newCategory.imageUrl = URL.createObjectURL(imageResponse.data);
-        } catch (error) {
-          newCategory.imageUrl = null;
-        }
-        setCategoryOSsData([...categoryOSsData, newCategory]);
-        setFilteredData([...filteredData, newCategory]);
-        showToast("Created successfully", "success");
+      try {
+        const imageResponse = await CategoryOfServiceService.getCategoryOSImage(newCategoryData.id);
+        imageUrl = URL.createObjectURL(imageResponse.data);
+      } catch (error) {
+        console.error(`Failed to load image for category ${newCategoryData.id}:`, error);
       }
+
+      setCategoryOSsData((prev) => {
+        if (editCategoryOS) {
+          return prev.map((category) =>
+            category.id === editCategoryOS.id ? newCategoryData : category
+          );
+        }
+        return [...prev, newCategoryData];
+      });
+
+      setFilteredData((prev) => {
+        if (editCategoryOS) {
+          return prev.map((category) =>
+            category.id === editCategoryOS.id ? newCategoryData : category
+          );
+        }
+        return [...prev, newCategoryData];
+      });
+
+      setImageCache((prev) => ({
+        ...prev,
+        [newCategoryData.id]: imageUrl,
+      }));
+
+      showToast(editCategoryOS ? "Updated category successfully" : "Created category successfully", "success");
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      showToast("Failed to save category", "error");
+    } finally {
       setShowForm(false);
       setEditCategoryOS(null);
-    } catch (error) {
-      console.error("Error saving category:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
-      showToast(`Error saving category: ${error.message}`, "error");
+      setLoading(false);
     }
   };
 
@@ -264,71 +269,53 @@ const Categories = () => {
     setShowActions(!showActions);
   };
 
-  const handleImport = async () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xlsx, .xls";
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
+    const reader = new FileReader();
+    reader.onload = async (event) => {
       try {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const data = new Uint8Array(event.target.result);
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-          const mappedData = jsonData.map((item) => ({
-            name: item.Name || "Unnamed Category",
-            status: item.Status === "active" ? "ACTIVE" : "INACTIVE",
-          }));
+        for (const item of jsonData) {
+          const categoryDTO = {
+            name: item.Name,
+            status: item.Status === "Active" ? "1" : "2",
+          };
+          await CategoryOfServiceService.createCategoryOfServices(categoryDTO, null);
+        }
 
-          await CategoryOfServiceService.importCategories(mappedData);
-          const response = await CategoryOfServiceService.getAllCategoryOfServices();
-          const categoriesWithImages = await Promise.all(
-            response.data.map(async (category) => {
-              try {
-                const imageResponse = await CategoryOfServiceService.getCategoryOSImage(category.id);
-                const imageUrl = URL.createObjectURL(imageResponse.data);
-                return { ...category, imageUrl };
-              } catch (error) {
-                return { ...category, imageUrl: null };
-              }
-            })
-          );
-          setCategoryOSsData(categoriesWithImages);
-          setFilteredData(categoriesWithImages);
-          showToast("Imported data successfully", "success");
-        };
-        reader.readAsArrayBuffer(file);
+        const response = await CategoryOfServiceService.getAllCategoryOfServices();
+        setCategoryOSsData(response.data);
+        setFilteredData(response.data);
+        showToast("Imported categories successfully", "success");
       } catch (error) {
         console.error("Error importing categories:", error);
-        showToast("Error importing data", "error");
+        showToast("Failed to import categories", "error");
       }
     };
-
-    input.click();
+    reader.readAsArrayBuffer(file);
   };
 
   const handleExport = () => {
     const exportData = categoryOSsData.map((item) => ({
       ID: item.id,
       Name: item.name,
-      Status: item.status === "active" ? "ACTIVE" : "INACTIVE",
+      Status: item.status === "1" ? "Active" : "Inactive",
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Categories");
     XLSX.writeFile(workbook, "Categories_Export.xlsx");
-    showToast("Exported Excel file successfully", "success");
+    showToast("Exported to Excel successfully", "success");
   };
 
   return (
-    <Suspense fallback={<Loading />}>
+    <>
       <section>
         <div>
           <header className="bg-white rounded-md p-4 flex items-center justify-between shadow-md">
@@ -339,15 +326,12 @@ const Categories = () => {
                 wrapInputStyle="!border-black/10 rounded-md focus-within:!border-[#435d63] transition-all"
                 inputStyle="font-serif placeholder:text-lg text-black placeholder:font-serif !p-4 !py-2"
                 id="search"
-                onChange={(event) =>
-                  handleFieldsChange("search", event.target.value)
-                }
+                value={searchInput}
+                onChange={(event) => handleFieldsChange("search", event.target.value)}
                 hasButton
                 Icon={CiSearch}
                 iconSize={24}
                 iconStyle="transition-all text-[#435d63] hover:text-black mx-4"
-                hasError={!!errors.searchInput}
-                errorMessage={errors.searchInput}
               />
             </div>
 
@@ -357,12 +341,12 @@ const Categories = () => {
                 className="text-sm rounded-md w-fit transition-all duration-700 hover:bg-black text-white bg-[#435d63] p-2 font-serif font-semibold"
                 onClick={handleActionsClicked}
               >
-                <p>Action</p>
+                Action
               </button>
               {showActions && (
                 <div className="overflow-hidden absolute z-10 top-full right-0 rounded-md bg-white w-fit shadow-md">
                   <button
-                    className="p-2 px-4 hover:bg-black/10 w-full"
+                    className="p-2 px-4 hover:bg-black/10 w-full text-left"
                     onClick={() => {
                       setEditCategoryOS(null);
                       setShowForm(true);
@@ -370,14 +354,17 @@ const Categories = () => {
                   >
                     Create
                   </button>
-                  <button
-                    className="p-2 px-4 hover:bg-black/10 w-full"
-                    onClick={handleImport}
-                  >
+                  <label className="p-2 px-4 hover:bg-black/10 w-full block cursor-pointer">
                     Import
-                  </button>
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls"
+                      className="hidden"
+                      onChange={handleImport}
+                    />
+                  </label>
                   <button
-                    className="p-2 px-4 hover:bg-black/10 w-full"
+                    className="p-2 px-4 hover:bg-black/10 w-full text-left"
                     onClick={handleExport}
                   >
                     Export
@@ -451,14 +438,14 @@ const Categories = () => {
         setToggle={() => setShowConfirmDeleteSingle(false)}
         onOk={confirmDeleteSingle}
         onCancel={() => setShowConfirmDeleteSingle(false)}
-        title="Are you sure you want to delete this?"
-        message="This action cannot be undone"
+        title="Are you sure you want to delete this category?"
+        message="This action can be undone"
         okButtonText="OK"
         cancelButtonText="Cancel"
       />
 
       <ToastContainer />
-    </Suspense>
+    </>
   );
 };
 

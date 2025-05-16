@@ -4,7 +4,7 @@ const baseURL = process.env.REACT_APP_API;
 
 class StoreService {
   // Lấy tất cả store
-  async getAllStores() {
+   getAllStores = async () => {
     try {
       return await apiInstance.get(`${baseURL}/stores`);
     } catch (error) {
@@ -13,7 +13,7 @@ class StoreService {
   }
 
   // Lấy store theo ID
-  async getStoreById(storeId) {
+   getStoreById = async (storeId)=> {
     try {
       return await apiInstance.get(`${baseURL}/stores/${storeId}`);
     } catch (error) {
@@ -22,7 +22,7 @@ class StoreService {
   }
 
   // Lấy ảnh của store theo ID
-  async getStoreImage(storeId) {
+   getStoreImage = async (storeId) => {
     try {
       return await apiInstance.get(`${baseURL}/stores/${storeId}/image`, {
         responseType: 'blob', 
@@ -33,7 +33,7 @@ class StoreService {
   }
 
   // Tạo store mới
-  async createStore(storeData, imageFile) {
+   createStore = async (storeData, imageFile) => {
     try {
     const formData = new FormData();
     formData.append("imageFile", imageFile);
@@ -55,7 +55,7 @@ class StoreService {
   }
 
   // Cập nhật store
-  async updateStore(storeId, storeData, imageFile) {
+   updateStore = async (storeId, storeData, imageFile) => {
     try {
       const formData = new FormData();
         formData.append(
@@ -65,7 +65,7 @@ class StoreService {
       if (imageFile) {
         formData.append('imageFile', imageFile);
       }
-      console.log(imageFile)
+
 
       return await apiInstance.put(`${baseURL}/stores/${storeId}`, formData, {
         headers: {
@@ -78,7 +78,7 @@ class StoreService {
   }
 
   // Xóa một store
-  async deleteStore(storeId) {
+   deleteStore =  async(storeId)  =>{
     try {
       return await apiInstance.delete(`${baseURL}/stores/${storeId}`);
     } catch (error) {
@@ -87,7 +87,7 @@ class StoreService {
   }
 
   // Xóa nhiều store
-  async deleteMultipleStores(storeIds) {
+   deleteMultipleStores = async (storeIds) => {
     try {
       return await apiInstance.delete(`${baseURL}/stores/delete-multiple`, {
         data: storeIds,
@@ -98,7 +98,7 @@ class StoreService {
   }
 
   // Import stores
-  async importStores(stores) {
+   importStores = async (stores) =>{
     try {
       return await apiInstance.post(`${baseURL}/stores/import`, stores);
     } catch (error) {

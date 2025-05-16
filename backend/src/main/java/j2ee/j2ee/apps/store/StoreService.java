@@ -33,8 +33,6 @@ public class StoreService {
                 .description(entity.getDescription())
                 .address(entity.getAddress())
                 .phone(entity.getPhone())
-
-
                 .createdAt(formatDateTime(entity.getCreated_at()))
                 .updatedAt(formatDateTime(entity.getUpdated_at()))
                 .openTime(formatTime(entity.getOpen_time()))
@@ -114,9 +112,11 @@ public class StoreService {
         StoreEntity entity = toEntity(storeDTO);
         entity.setCreated_at(LocalDateTime.now());
         entity.setUpdated_at(LocalDateTime.now());
-        entity.setImageName(multipartFile.getOriginalFilename());
-        entity.setImageType(multipartFile.getContentType());
-        entity.setImage(multipartFile.getBytes());
+        if (multipartFile != null && !multipartFile.isEmpty()) {
+            entity.setImageName(multipartFile.getOriginalFilename());
+            entity.setImageType(multipartFile.getContentType());
+            entity.setImage(multipartFile.getBytes());
+        }
 
 
         StoreEntity saved = storeRepository.save(entity);

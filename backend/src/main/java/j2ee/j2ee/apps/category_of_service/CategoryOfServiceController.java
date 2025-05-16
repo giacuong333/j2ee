@@ -60,7 +60,7 @@ public class CategoryOfServiceController {
 
     // Update
     @PutMapping("/{id}")
-    public ResponseEntity<CategoryOfServiceDTO> updateCategory(@PathVariable Integer id, @RequestPart CategoryOfServiceDTO categoryDTO,@RequestPart(required = false) MultipartFile imageFile) {
+    public ResponseEntity<CategoryOfServiceDTO> updateCategory(@PathVariable Integer id, @RequestPart(required = false) CategoryOfServiceDTO categoryDTO,@RequestPart(required = false) MultipartFile imageFile) {
         try {
             CategoryOfServiceDTO updatedCategory = categoryService.updateCategory(id, categoryDTO,imageFile);
             return ResponseEntity.ok(updatedCategory);
