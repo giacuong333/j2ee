@@ -4,67 +4,107 @@ const baseURL = process.env.REACT_APP_API;
 
 class StoreService {
   // Lấy tất cả store
-  getAllStores = async () => {
-    return await apiInstance.get(`${baseURL}/stores`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  async getAllStores() {
+    try {
+      return await apiInstance.get(`${baseURL}/stores`);
+    } catch (error) {
+      throw new Error(`Lỗi khi lấy danh sách store: ${error.message}`);
+    }
+  }
 
-  // Lấy Store  theo ID
-  getStoreById = async (roleId) => {
-    return await apiInstance.get(`${baseURL}/stores/${roleId}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Lấy store theo ID
+  async getStoreById(storeId) {
+    try {
+      return await apiInstance.get(`${baseURL}/stores/${storeId}`);
+    } catch (error) {
+      throw new Error(`Lỗi khi lấy store ID ${storeId}: ${error.message}`);
+    }
+  }
 
-  // Tạo Store  mới
-  createStore = async (payload) => {
-    return await apiInstance.post(`${baseURL}/stores`, payload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Lấy ảnh của store theo ID
+  async getStoreImage(storeId) {
+    try {
+      return await apiInstance.get(`${baseURL}/stores/${storeId}/image`, {
+        responseType: 'blob', 
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi lấy ảnh store ID ${storeId}: ${error.message}`);
+    }
+  }
 
-  // Cập nhật Store 
-  updateStore = async (storeId, payload) => {
-    return await apiInstance.put(`${baseURL}/stores/${storeId}`, payload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Tạo store mới
+  async createStore(storeData, imageFile) {
+    try {
+    const formData = new FormData();
+    formData.append("imageFile", imageFile);
+    formData.append(
+      "storeDTO",
+      new Blob([JSON.stringify(storeData)], { type: "application/json" })
+    );
+  
+ 
 
-  // Xóa một Store 
-  deleteStore = async (storeId) => {
-    return await apiInstance.delete(`${baseURL}/stores/${storeId}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+      return await apiInstance.post(`${baseURL}/stores`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi tạo store: ${error.message}`);
+    }
+  }
 
-  // Xóa nhiều Store 
-  deleteMultipleStores = async (storeIds) => {
-    return await apiInstance.delete(`${baseURL}/stores/delete-multiple`, {
-      data: storeIds, 
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
-  // Import Stores 
-  importStores = async (stores) => {
-    return await apiInstance.post(`${baseURL}/stores/import`, stores, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Cập nhật store
+  async updateStore(storeId, storeData, imageFile) {
+    try {
+      const formData = new FormData();
+        formData.append(
+      "storeDTO",
+      new Blob([JSON.stringify(storeData)], { type: "application/json" })
+    );
+      if (imageFile) {
+        formData.append('imageFile', imageFile);
+      }
+      console.log(imageFile)
+
+      return await apiInstance.put(`${baseURL}/stores/${storeId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi cập nhật store ID ${storeId}: ${error.message}`);
+    }
+  }
+
+  // Xóa một store
+  async deleteStore(storeId) {
+    try {
+      return await apiInstance.delete(`${baseURL}/stores/${storeId}`);
+    } catch (error) {
+      throw new Error(`Lỗi khi xóa store ID ${storeId}: ${error.message}`);
+    }
+  }
+
+  // Xóa nhiều store
+  async deleteMultipleStores(storeIds) {
+    try {
+      return await apiInstance.delete(`${baseURL}/stores/delete-multiple`, {
+        data: storeIds,
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi xóa nhiều store: ${error.message}`);
+    }
+  }
+
+  // Import stores
+  async importStores(stores) {
+    try {
+      return await apiInstance.post(`${baseURL}/stores/import`, stores);
+    } catch (error) {
+      throw new Error(`Lỗi khi import stores: ${error.message}`);
+    }
+  }
 }
 
 export default new StoreService();

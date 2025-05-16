@@ -1,29 +1,46 @@
 package j2ee.j2ee.apps.store;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/stores")
-public class StoreController {
+    public class StoreController {
 
-    @Autowired
-    private StoreService storeService;
+        @Autowired
+        private StoreService storeService;
 
-    // Create
-    @PostMapping
-    public ResponseEntity<StoreDTO> createStore(@RequestBody StoreDTO storeDTO) {
-        try {
-            StoreDTO createdStore = storeService.createStore(storeDTO);
-            return ResponseEntity.ok(createdStore);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(null);
+        // Create
+        @PostMapping
+        public ResponseEntity<StoreDTO> createStore(
+                @RequestPart StoreDTO storeDTO,
+                @RequestPart(required = false) MultipartFile imageFile
+        ) {
+            try {
+                StoreDTO createdStore = storeService.createStore(storeDTO, imageFile);
+                return ResponseEntity.ok(createdStore);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.badRequest().body(null);
+            }
         }
+
+
+
+    @GetMapping("{storeId}/image")
+    public ResponseEntity<byte[]> getImageByStoreId(@PathVariable long storeId) {
+        StoreEntity store = storeService.getStore(storeId);
+        byte[] imageFile = store.getImage();
+        return ResponseEntity.ok().contentType(MediaType.valueOf(store.getImageType())).body(imageFile);
+
     }
 
     // Lấy tất cả stores
@@ -49,13 +66,15 @@ public class StoreController {
     }
 
     // Update
-    @PutMapping("/{id}")
-    public ResponseEntity<StoreDTO> updateStore(@PathVariable Long id, @RequestBody StoreDTO storeDTO) {
+    @PutMapping("/{storeId}")
+    public ResponseEntity<StoreDTO> updateStore(@PathVariable Long storeId, @RequestPart StoreDTO storeDTO,@RequestPart(required = false) MultipartFile imageFile) {
         try {
-            StoreDTO updatedStore = storeService.updateStore(id, storeDTO);
+            StoreDTO updatedStore = storeService.updateStore(storeId, storeDTO,imageFile);
             return ResponseEntity.ok(updatedStore);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(null);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

@@ -1,9 +1,6 @@
 package j2ee.j2ee.apps.category_of_service;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity(name = "categories_of_services")
@@ -16,7 +13,11 @@ public class CategoryOfServiceEntity {
 
     private String name;
 
-    private String image;
+    private String imageName;
+    private String imageType;
+    @Lob
+    private byte[] image;
+
 
     private String status;
 }

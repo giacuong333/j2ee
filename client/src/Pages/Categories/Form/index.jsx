@@ -9,22 +9,26 @@ const Overlay = React.lazy(() => import("../../../Components/Overlay"));
 const Loading = React.lazy(() => import("../../../Components/Loading"));
 
 const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) => {
-  const [fields, setFields] = useState({ name: "", status: "", image: "" });
+  const [fields, setFields] = useState({ name: "", status: "" });
   const [file, setFile] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [errors, setErrors] = useState({});
   const [pending, setPending] = useState(false);
+
 
   useEffect(() => {
     if (initialData) {
       setFields({
         name: initialData.name || "",
         status: initialData.status || "",
-        image: initialData.Image || initialData.image || "", 
-        
       });
+      setPreviewImage(initialData.imageUrl || null);
+      setFile(null);
       setErrors({});
     } else {
-      setFields({ name: "", status: "", image: "" });
+      setFields({ name: "", status: "" });
+      setPreviewImage(null);
+      setFile(null);
       setErrors({});
     }
   }, [initialData]);
@@ -40,7 +44,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     if (!isDisabled && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      setFields((prev) => ({ ...prev, image: selectedFile.name })); 
+      setPreviewImage(URL.createObjectURL(selectedFile));
       setErrors((prev) => ({ ...prev, image: "" }));
     }
   };
@@ -75,34 +79,49 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
 
     setPending(true);
     try {
-    
-      const data = {
+      const categoryDTO = {
         name: fields.name,
         status: fields.status,
-        image: fields.image || undefined, 
       };
 
-      let response;
    
+      const submitData = { categoryDTO, imageFile: file };
+
+   
+      let response;
       if (initialData) {
         response = await CategoryOfServiceService.updateCategoryOfServices(
           initialData.id,
-          data
+          submitData.categoryDTO,
+          submitData.imageFile
         );
       } else {
-        response = await CategoryOfServiceService.createCategoryOfServices(data);
-        
+        response = await CategoryOfServiceService.createCategoryOfServices(
+          submitData.categoryDTO,
+          submitData.imageFile
+        );
       }
 
       if (response && response.data) {
+ 
+        try {
+          const imageResponse = await CategoryOfServiceService.getCategoryOSImage(response.data.id);
+          response.data.imageUrl = URL.createObjectURL(imageResponse.data);
+        } catch (error) {
+          response.data.imageUrl = null;
+        }
         onSubmit(response.data);
-        showToast(initialData ? "Cập nhật thành công" : "Tạo thành công", "success");
+        showToast(initialData ? "Updated successfully" : "Created successfully", "success");
         setToggle(false);
       }
     } catch (error) {
-      console.error("Lỗi khi lưu:", error);
+      console.error("Error saving category:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
       showToast(
-        "Lỗi khi lưu: " + (error.response?.data?.message || error.message),
+        `Error saving category: ${error.response?.data?.message || error.message}`,
         "error"
       );
     } finally {
@@ -126,19 +145,18 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
           <div className="flex items-center justify-between w-full mb-4">
             <p className="font-semibold text-lg">
               {isDisabled
-                ? "Thông tin danh mục"
+                ? "Category Information"
                 : initialData
-                ? "Chỉnh sửa danh mục"
-                : "Tạo danh mục"}
+                ? "Edit Category"
+                : "Create Category"}
             </p>
             <IoClose size={26} className="cursor-pointer" onClick={setToggle} />
           </div>
 
           <div className="space-y-4">
-
-          {!isDisabled && (
+            {!isDisabled && (
               <div>
-                <label className="block mb-1 font-serif font-medium">Ảnh danh mục</label>
+                <label className="block mb-1 font-serif font-medium">Category Image</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -146,27 +164,27 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                   className="w-full p-2 border rounded"
                   disabled={isDisabled}
                 />
+                {errors.image && (
+                  <p className="text-red-500 text-sm mt-1">{errors.image}</p>
+                )}
               </div>
             )}
 
-            {fields.image && (
+            {previewImage && (
               <div className="mt-4">
-                <label className="block mb-1 font-serif font-medium">Xem trước ảnh</label>
+                <label className="block mb-1 font-serif font-medium">Image Preview</label>
                 <img
-                  src={
-                    file
-                      ? URL.createObjectURL(file)
-                      : `/src/assets/categoryOfService/${fields.image}`
-                  }
+                  src={previewImage}
                   alt={fields.name || "Category Image"}
                   className="w-32 h-32 object-cover rounded-md"
                   onError={(e) => {
                     e.target.src = "/src/assets/categoryOfService/default.jpg";
-                    console.error("Không tìm thấy ảnh:", fields.image);
+                    console.error("Image not found:", previewImage);
                   }}
                 />
               </div>
             )}
+
             <FormControl
               type="text"
               placeHolder="Enter Name"
@@ -208,12 +226,10 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               disabled={isDisabled}
               options={[
                 { value: "", label: "Choose status" },
-                { value: "1", label: "Active" },
-                { value: "2", label: "Inactive" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
               ]}
             />
-
-            
           </div>
 
           <div className="flex items-center gap-4 mt-6">
@@ -235,7 +251,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                   {pending ? (
                     <Loading customStyle="flex items-center justify-center" />
                   ) : (
-                    <p>{initialData ? "Cập nhật" : "Tạo"}</p>
+                    <p>{initialData ? "Update" : "Create"}</p>
                   )}
                 </button>
               </>
@@ -246,7 +262,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 className="transition-all duration-700 hover:bg-black text-white bg-[#799aa1] w-full py-2 rounded font-serif font-semibold"
                 onClick={() => setToggle(false)}
               >
-               Close
+                Close
               </button>
             )}
           </div>

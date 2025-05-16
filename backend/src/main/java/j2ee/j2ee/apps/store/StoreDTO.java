@@ -1,6 +1,7 @@
 package j2ee.j2ee.apps.store;
 
 import j2ee.j2ee.apps.user.UserDTO;
+import jakarta.persistence.Lob;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +17,11 @@ public class StoreDTO {
     private String description;
     private String address;
     private String phone;
-    private String image;
+
+    private String imageName;
+    private String imageType;
+    @Lob
+    private byte[] image;
     private String createdAt;
     private String updatedAt;
     private String openTime;

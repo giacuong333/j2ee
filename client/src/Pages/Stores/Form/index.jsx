@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { isEmpty } from "../../../Utils/validation";
 import { IoClose } from "react-icons/io5";
 import { showToast } from "../../../Components/Toast";
@@ -15,15 +15,13 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     description: "",
     address: "",
     phone: "",
-    createdAt: "",
-    updateAt: "",
     openTime: "",
     closeTime: "",
-    ownerId:  "" ,
+    ownerId: "",
     status: "",
-    image: "",
   });
   const [file, setFile] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
   const [errors, setErrors] = useState({});
   const [pending, setPending] = useState(false);
   const [owners, setOwners] = useState([]);
@@ -35,35 +33,32 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
         description: initialData.description || "",
         address: initialData.address || "",
         phone: initialData.phone || "",
-        createdAt: initialData.createdAt || "",
-        updateAt: initialData.updateAt || "",
         openTime: initialData.openTime || "",
         closeTime: initialData.closeTime || "",
-
-        ownerId: initialData.ownerId.id || "",
+        ownerId: initialData.ownerId?.id ? String(initialData.ownerId.id) : "",
         status: initialData.status || "",
-        image: initialData.image || "",
       });
       setErrors({});
-
+      if (initialData.id) {
+        fetchImage(initialData.id);
+      }
     } else {
       setFields({
         name: "",
         description: "",
         address: "",
         phone: "",
-        createdAt: "",
-        updateAt: "",
         openTime: "",
         closeTime: "",
         ownerId: "",
         status: "",
-        image: "",
       });
       setErrors({});
+      setImageUrl(null);
+      setFile(null);
     }
   }, [initialData]);
- console.log("name:" + fields.ownerId.id)
+
   useEffect(() => {
     const fetchOwners = async () => {
       try {
@@ -78,14 +73,21 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
     };
     fetchOwners();
   }, []);
+
+  const fetchImage = async (storeId) => {
+    try {
+      const response = await StoreService.getStoreImage(storeId);
+      const url = URL.createObjectURL(response.data);
+      setImageUrl(url);
+    } catch (error) {
+      console.error("Lỗi khi lấy ảnh:", error);
+      showToast("Không thể tải ảnh cửa hàng", "error");
+    }
+  };
+
   const handleFieldsChange = (key, value) => {
     if (!isDisabled) {
-      if (key === "ownerId") {
-        console.log("Selected ownerId value:", value);
-        setFields((prev) => ({ ...prev, ownerId: value })); 
-      } else {
-        setFields((prev) => ({ ...prev, [key]: value }));
-      }
+      setFields((prev) => ({ ...prev, [key]: value }));
       setErrors((prev) => ({ ...prev, [key]: "" }));
     }
   };
@@ -93,8 +95,27 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
   const handleFileChange = (e) => {
     if (!isDisabled && e.target.files[0]) {
       const selectedFile = e.target.files[0];
+      const validTypes = ["image/png", "image/jpeg", "image/jpg"];
+      setErrors((prev) => ({ ...prev, image: "" }));
+      if (!validTypes.includes(selectedFile.type)) {
+        setErrors((prev) => ({
+          ...prev,
+          image: "Chỉ hỗ trợ file PNG, JPG, JPEG",
+        }));
+        setFile(null);
+        setImageUrl(null);
+        return;
+      }
+      
+      if (selectedFile.size > 1 * 1024 * 1024) {
+        setErrors((prev) => ({
+          ...prev,
+          image: "File không được lớn hơn 1MB",
+        }));
+        return;
+      }
       setFile(selectedFile);
-      setFields((prev) => ({ ...prev, image: selectedFile.name }));
+      setImageUrl(URL.createObjectURL(selectedFile));
       setErrors((prev) => ({ ...prev, image: "" }));
     }
   };
@@ -114,21 +135,31 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
   const validateForm = () => {
     let newErrors = {};
     if (isEmpty(fields.name)) newErrors.name = "Name is required";
-    if (isEmpty(fields.phone)) newErrors.phone = "Phone number is required";
     if (isEmpty(fields.description)) newErrors.description = "Description is required";
     if (isEmpty(fields.address)) newErrors.address = "Address is required";
-    if (isEmpty(fields.status)) newErrors.status = "Status is required";
-    if (isEmpty(fields.ownerId.id)) newErrors.ownerId = "Store owner is required";
+    if (isEmpty(fields.phone)) newErrors.phone = "Phone number is required";
     if (isEmpty(fields.openTime)) newErrors.openTime = "Opening time is required";
     if (isEmpty(fields.closeTime)) newErrors.closeTime = "Closing time is required";
+    if (isEmpty(fields.ownerId)) newErrors.ownerId = "Store owner is required";
+    if (isEmpty(fields.status)) newErrors.status = "Status is required";
+
     if (fields.phone) {
-      const phoneRegex = /^\d+$/; 
+      const phoneRegex = /^\d+$/;
       if (!phoneRegex.test(fields.phone)) {
         newErrors.phone = "Phone number must contain only digits";
       } else if (fields.phone.length !== 10) {
         newErrors.phone = "Phone number must be exactly 10 digits";
       }
     }
+
+    if (fields.openTime && fields.closeTime) {
+      const open = new Date(`1970-01-01T${fields.openTime}:00`);
+      const close = new Date(`1970-01-01T${fields.closeTime}:00`);
+      if (open >= close) {
+        newErrors.closeTime = "Closing time must be after opening time";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -139,27 +170,27 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
 
     setPending(true);
     try {
-   
-      const data = {
+      const storeData = {
         name: fields.name,
         description: fields.description,
         address: fields.address,
         phone: fields.phone,
-        createdAt: null,
-        updateAt: null,
         openTime: fields.openTime,
         closeTime: fields.closeTime,
         ownerId: fields.ownerId ? { id: Number(fields.ownerId) } : null,
         status: fields.status,
-        image: fields.image || undefined,
       };
-      console.log("data1: "+data );
 
       let response;
       if (initialData) {
-        response = await StoreService.updateStore(initialData.id, data);
+        response = await StoreService.updateStore(initialData.id, storeData, file);
       } else {
-        response = await StoreService.createStore(data);
+        if (!file) {
+          showToast("Please select a store image", "error");
+          setPending(false);
+          return;
+        }
+        response = await StoreService.createStore(storeData, file);
       }
 
       if (response && response.data) {
@@ -179,7 +210,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
   };
 
   return (
-    <>
+    <Suspense fallback={<Loading />}>
       <Overlay toggle={toggle} setToggle={setToggle} />
       <section
         className={`
@@ -199,7 +230,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 ? "Chỉnh sửa cửa hàng"
                 : "Tạo cửa hàng"}
             </p>
-            <IoClose size={26} className="cursor-pointer" onClick={setToggle} />
+            <IoClose size={26} className="cursor-pointer" onClick={() => setToggle(false)} />
           </div>
 
           <div className="space-y-4">
@@ -208,22 +239,24 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 <label className="block mb-1 font-serif font-medium">Ảnh cửa hàng</label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   onChange={handleFileChange}
                   className="w-full p-2 border rounded"
                   disabled={isDisabled}
                 />
+                {errors.image && (
+                  <p className="text-red-500 text-sm mt-1">{errors.image}</p>
+                )}
               </div>
             )}
 
-            {fields.image && (
+            {imageUrl && (
               <div className="mt-4">
                 <label className="block mb-1 font-serif font-medium">Xem trước ảnh</label>
                 <img
-                  src={file ? URL.createObjectURL(file) : fields.image}
+                  src={imageUrl}
                   alt={fields.name || "Store Image"}
                   className="w-32 h-32 object-cover rounded-md"
-                
                 />
               </div>
             )}
@@ -243,14 +276,14 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onBlur={() =>
                 isEmpty(fields.name) && handleFieldsBlur("name", "Name is required")
               }
-              hasError={!!errors?.name}
-              errorMessage={errors?.name}
+              hasError={!!errors.name}
+              errorMessage={errors.name}
               disabled={isDisabled}
             />
 
             <FormControl
               type="textarea"
-             placeHolder="Enter description"
+              placeHolder="Enter description"
               wrapInputStyle=""
               inputStyle="placeholder:text-lg text-black placeholder:font-serif"
               hasLabel
@@ -261,14 +294,13 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onChange={(event) => handleFieldsChange("description", event.target.value)}
               onType={() => handleFieldsType("description")}
               onBlur={() =>
-                isEmpty(fields.description) && handleFieldsBlur("description", "Description is required")
+                isEmpty(fields.description) &&
+                handleFieldsBlur("description", "Description is required")
               }
               disabled={isDisabled}
-              hasError={!!errors?.description}
-              errorMessage={errors?.description}
-          
+              hasError={!!errors.description}
+              errorMessage={errors.description}
             />
-          
 
             <FormControl
               type="text"
@@ -286,8 +318,8 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 isEmpty(fields.address) && handleFieldsBlur("address", "Address is required")
               }
               disabled={isDisabled}
-              hasError={!!errors?.address}
-              errorMessage={errors?.address}
+              hasError={!!errors.address}
+              errorMessage={errors.address}
             />
 
             <FormControl
@@ -303,12 +335,11 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onChange={(event) => handleFieldsChange("phone", event.target.value)}
               onType={() => handleFieldsType("phone")}
               onBlur={() =>
-                isEmpty(fields.phone) &&
-                handleFieldsBlur("phone", "Phone is required")
+                isEmpty(fields.phone) && handleFieldsBlur("phone", "Phone number is required")
               }
               disabled={isDisabled}
-              hasError={!!errors?.phone}
-              errorMessage={errors?.phone}
+              hasError={!!errors.phone}
+              errorMessage={errors.phone}
             />
 
             <FormControl
@@ -324,10 +355,10 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onType={() => handleFieldsType("openTime")}
               onBlur={() =>
                 isEmpty(fields.openTime) &&
-                handleFieldsBlur("openTime", "Opening time is required ")
+                handleFieldsBlur("openTime", "Opening time is required")
               }
-              hasError={!!errors?.openTime}
-              errorMessage={errors?.openTime}
+              hasError={!!errors.openTime}
+              errorMessage={errors.openTime}
               disabled={isDisabled}
             />
 
@@ -346,37 +377,37 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 isEmpty(fields.closeTime) &&
                 handleFieldsBlur("closeTime", "Closing time is required")
               }
-              hasError={!!errors?.closeTime}
-              errorMessage={errors?.closeTime}
+              hasError={!!errors.closeTime}
+              errorMessage={errors.closeTime}
               disabled={isDisabled}
-        
             />
-<FormControl
-  type="select"
-  wrapInputStyle=""
-  inputStyle="placeholder:text-lg text-black placeholder:font-serif"
-  hasLabel
-  id="ownerId"
-  label="Owner"
-  labelStyle="mb-1 font-serif"
-  value={fields.ownerId || ""} 
-  onChange={(event) => handleFieldsChange("ownerId", event.target.value)}
-  onType={() => handleFieldsType("ownerId")}
-  onBlur={() =>
-    isEmpty(fields.ownerId) &&
-    handleFieldsBlur("ownerId", "Owner is required")
-  }
-  hasError={!!errors?.ownerId}
-  errorMessage={errors?.ownerId}
-  disabled={isDisabled}
-  options={[
-    { value: "", label: "Choose owner" },
-    ...(Array.isArray(owners) ? owners : []).map((owner) => ({
-      value: String(owner.id),
-      label: owner.name,
-    })),
-  ]}
-/>
+
+            <FormControl
+              type="select"
+              wrapInputStyle=""
+              inputStyle="placeholder:text-lg text-black placeholder:font-serif"
+              hasLabel
+              id="ownerId"
+              label="Owner"
+              labelStyle="mb-1 font-serif"
+              value={fields.ownerId}
+              onChange={(event) => handleFieldsChange("ownerId", event.target.value)}
+              onType={() => handleFieldsType("ownerId")}
+              onBlur={() =>
+                isEmpty(fields.ownerId) && handleFieldsBlur("ownerId", "Store owner is required")
+              }
+              hasError={!!errors.ownerId}
+              errorMessage={errors.ownerId}
+              disabled={isDisabled}
+              options={[
+                { value: "", label: "Choose owner" },
+                ...(Array.isArray(owners) ? owners : []).map((owner) => ({
+                  value: String(owner.id),
+                  label: owner.name,
+                })),
+              ]}
+            />
+
             <FormControl
               type="select"
               wrapInputStyle=""
@@ -389,16 +420,15 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
               onChange={(event) => handleFieldsChange("status", event.target.value)}
               onType={() => handleFieldsType("status")}
               onBlur={() =>
-                isEmpty(fields.status) &&
-                handleFieldsBlur("status", "Status is required")
+                isEmpty(fields.status) && handleFieldsBlur("status", "Status is required")
               }
-              hasError={!!errors?.status}
-              errorMessage={errors?.status}
+              hasError={!!errors.status}
+              errorMessage={errors.status}
               disabled={isDisabled}
               options={[
                 { value: "", label: "Choose status" },
-                { value: "1", label: "Active" },
-                { value: "2", label: "Inactive" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
               ]}
             />
           </div>
@@ -409,7 +439,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
                 <button
                   type="button"
                   className="transition-all duration-700 text-black w-full py-2 rounded font-serif font-semibold bg-gray-200 hover:bg-gray-300"
-                  onClick={setToggle}
+                  onClick={() => setToggle(false)}
                   disabled={pending}
                 >
                   Cancel
@@ -439,7 +469,7 @@ const Form = ({ toggle, setToggle, initialData, onSubmit, isDisabled = false }) 
           </div>
         </form>
       </section>
-    </>
+    </Suspense>
   );
 };
 

@@ -4,59 +4,126 @@ const baseURL = process.env.REACT_APP_API;
 
 class CategoryOfServiceService {
   // Lấy tất cả Category Of Service
-  getAllCategoryOfServices = async () => {
-    return await apiInstance.get(`${baseURL}/categoryOfServices`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  async getAllCategoryOfServices() {
+    try {
+      return await apiInstance.get(`${baseURL}/categoryOfServices`, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi lấy danh sách category: ${error.response?.data?.message || error.message}`);
+    }
+  }
 
-  // Lấy Category Of Service  theo ID
-  getCategoryOfServicesById = async (categoryOfServiceId) => {
-    return await apiInstance.get(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Lấy Category Of Service theo ID
+  async getCategoryOfServicesById(categoryOfServiceId) {
+    try {
+      return await apiInstance.get(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi lấy category ID ${categoryOfServiceId}: ${error.response?.data?.message || error.message}`);
+    }
+  }
 
-  // Tạo Category Of Service  mới
-  createCategoryOfServices = async (payload) => {
-    return await apiInstance.post(`${baseURL}/categoryOfServices`, payload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Lấy image của Category Of Service theo ID
+  async getCategoryOSImage(categoryOfServiceId) {
+    try {
+      return await apiInstance.get(`${baseURL}/categoryOfServices/${categoryOfServiceId}/image`, {
+        responseType: "blob",
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi lấy ảnh category ID ${categoryOfServiceId}: ${error.response?.data?.message || error.message}`);
+    }
+  }
 
-  // Cập nhật Category Of Service 
-  updateCategoryOfServices= async (categoryOfServiceId, payload) => {
-    return await apiInstance.put(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, payload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+  // Tạo Category Of Service
+  async createCategoryOfServices(categoryOfServiceDTO, imageFile) {
+    try {
+      const formData = new FormData();
+      if (imageFile) {
+        formData.append("imageFile", imageFile);
+      }
+      formData.append(
+        "categoryDTO",
+        new Blob([JSON.stringify(categoryOfServiceDTO)], { type: "application/json" })
+      );
 
-  // Xóa một Category Of Service 
-  deleteCategoryOfService = async (categoryOfServiceId) => {
-    return await apiInstance.delete(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+      
 
-  // Xóa nhiều Category Of Service 
-  deleteMultipleCategoryOfServices = async (categoryOfServiceIds) => {
-    return await apiInstance.delete(`${baseURL}/categoryOfServices/delete-multiple`, {
-      data: categoryOfServiceIds, 
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  };
+      return await apiInstance.post(`${baseURL}/categoryOfServices`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          
+        },
+      });
+    } catch (error) {
+      console.error("Lỗi chi tiết:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+      throw new Error(`Lỗi khi tạo category: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  // Cập nhật Category Of Service
+  async updateCategoryOfServices(id, categoryOfServiceDTO, imageFile) {
+    try {
+      const formData = new FormData();
+      formData.append(
+        "categoryDTO",
+        new Blob([JSON.stringify(categoryOfServiceDTO)], { type: "application/json" })
+      );
+      if (imageFile) {
+        formData.append("imageFile", imageFile);
+      }
+
+
+      return await apiInstance.put(`${baseURL}/categoryOfServices/${id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    } catch (error) {
+      console.error("Lỗi chi tiết:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+      throw new Error(`Lỗi khi cập nhật category ID ${id}: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  // Xóa một Category Of Service
+  async deleteCategoryOfService(categoryOfServiceId) {
+    try {
+      return await apiInstance.delete(`${baseURL}/categoryOfServices/${categoryOfServiceId}`, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi xóa category ID ${categoryOfServiceId}: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  // Xóa nhiều Category Of Service
+  async deleteMultipleCategoryOfServices(categoryOfServiceIds) {
+    try {
+      return await apiInstance.delete(`${baseURL}/categoryOfServices/delete-multiple`, {
+        data: categoryOfServiceIds,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      throw new Error(`Lỗi khi xóa nhiều category: ${error.response?.data?.message || error.message}`);
+    }
+  }
 }
 
 export default new CategoryOfServiceService();

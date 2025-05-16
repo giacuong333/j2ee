@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import DataTable from "react-data-table-component";
 import { isEmpty } from "../../Utils/validation.js";
 import { CiSearch } from "react-icons/ci";
@@ -10,6 +10,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { showToast } from "../../Components/Toast/index.jsx";
 import StoreService from "../../Services/store";
 import * as XLSX from "xlsx";
+
 const FormControl = React.lazy(() => import("../../Components/FormControl/index.jsx"));
 const Loading = React.lazy(() => import("../../Components/Loading/index.jsx"));
 const Form = React.lazy(() => import("./Form/index.jsx"));
@@ -38,8 +39,8 @@ const SubHeader = ({ selectedRows, handleDeleteMultiple }) => {
         setToggle={() => setShowConfirmDelete(false)}
         onOk={handleDeleteMultiple}
         onCancel={() => setShowConfirmDelete(false)}
-        title="Are you sure you want to delete this?"
-        message="This action can be undone"
+        title="Are you sure you want to delete these?"
+        message="This action cannot be undone"
         okButtonText="OK"
         cancelButtonText="Cancel"
       />
@@ -64,17 +65,17 @@ const Stores = () => {
       sortable: true,
       cell: (row) => (
         <img
-          // src={row.image ? `/assets/images/store/${row.image}` : "/assets/images/store/default.jpg"}
+          src={row.imageUrl || "../../assets/images/store/default.png"}
           alt={row.name || "Store"}
           style={{ width: "50px", height: "50px", objectFit: "cover" }}
-          onError={(e) => (e.target.src = "/assets/images/store/default.jpg")}
+          
         />
       ),
     },
     {
       name: "Name",
       sortable: true,
-      selector: (row) => row.name,
+      selector: (row) => row.name || "N/A",
     },
     {
       name: "Description",
@@ -89,15 +90,12 @@ const Stores = () => {
     {
       name: "Owner",
       sortable: true,
-      selector: (row) => {
-       
-        return row.ownerId?.name || "N/A";
-      },
+      selector: (row) => row.ownerId?.name || "N/A",
     },
     {
       name: "Status",
       sortable: true,
-      selector: (row) => (row.status === "1" ? "Active" : "Inactive"),
+      selector: (row) => (row.status === "active" ? "Active" : "Inactive"),
     },
     {
       name: "Actions",
@@ -137,7 +135,19 @@ const Stores = () => {
       try {
         setLoading(true);
         const response = await StoreService.getAllStores();
-        setStoresData(response.data);
+        const storesWithImages = await Promise.all(
+          response.data.map(async (store) => {
+            try {
+              const imageResponse = await StoreService.getStoreImage(store.id);
+              const imageUrl = URL.createObjectURL(imageResponse.data);
+              return { ...store, imageUrl };
+            } catch (error) {
+              console.error(`Lỗi khi tải ảnh cho store ${store.id}:`, error);
+              return { ...store, imageUrl: null };
+            }
+          })
+        );
+        setStoresData(storesWithImages);
       } catch (error) {
         showToast("Lỗi khi tải danh sách cửa hàng", "error");
       } finally {
@@ -149,6 +159,7 @@ const Stores = () => {
 
   const handleFieldsChange = (key, value) => {
     setSearchInput(value);
+    setErrors("");
   };
 
   const handleRowsSelected = ({ selectedRows }) => {
@@ -193,18 +204,40 @@ const Stores = () => {
   const handleFormSubmit = async (newStoreData) => {
     try {
       if (editStore) {
-        const response = await StoreService.updateStore(editStore.id, newStoreData);
+        const response = await StoreService.updateStore(
+          editStore.id,
+          newStoreData.storeData,
+          newStoreData.imageFile
+        );
+        const updatedStore = response.data;
+        try {
+          const imageResponse = await StoreService.getStoreImage(updatedStore.id);
+          updatedStore.imageUrl = URL.createObjectURL(imageResponse.data);
+        } catch (error) {
+          updatedStore.imageUrl = null;
+        }
         setStoresData(
           storesData.map((store) =>
-            store.id === editStore.id ? response.data : store
+            store.id === editStore.id ? updatedStore : store
           )
         );
       } else {
-        const response = await StoreService.createStore(newStoreData);
-        setStoresData([...storesData, response.data]);
+        const response = await StoreService.createStore(
+          newStoreData.storeData,
+          newStoreData.imageFile
+        );
+        const newStore = response.data;
+        try {
+          const imageResponse = await StoreService.getStoreImage(newStore.id);
+          newStore.imageUrl = URL.createObjectURL(imageResponse.data);
+        } catch (error) {
+          newStore.imageUrl = null;
+        }
+        setStoresData([...storesData, newStore]);
       }
       setShowForm(false);
       setEditStore(null);
+      showToast(editStore ? "Cập nhật thành công" : "Tạo thành công", "success");
     } catch (error) {
       console.error("Lỗi khi lưu:", error);
       showToast("Lỗi khi lưu", "error");
@@ -237,23 +270,32 @@ const Stores = () => {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      
           const mappedData = jsonData.map((item) => ({
             name: item.Name || "Unnamed Store",
             description: item.Description || null,
             address: item.Address || null,
             phone: item.Phone || null,
-            owner: { id: item.ownerId }, 
-            status: item.Status || "1",
-            open_time: item["Open Time"] || null,
-            close_time: item["Close Time"] || null,
-            image: item.Image || null,
+            owner: { id: Number(item.OwnerID) || null },
+            status: item.Status === "Active" ? "ACTIVE" : "INACTIVE",
+            openTime: item["Open Time"] || null,
+            closeTime: item["Close Time"] || null,
           }));
 
           await StoreService.importStores(mappedData);
           const response = await StoreService.getAllStores();
-          setStoresData(Array.isArray(response.data) ? response.data : []);
-          showToast("Import dữ liệu thành công (chỉ thêm mới)", "success");
+          const storesWithImages = await Promise.all(
+            response.data.map(async (store) => {
+              try {
+                const imageResponse = await StoreService.getStoreImage(store.id);
+                const imageUrl = URL.createObjectURL(imageResponse.data);
+                return { ...store, imageUrl };
+              } catch (error) {
+                return { ...store, imageUrl: null };
+              }
+            })
+          );
+          setStoresData(storesWithImages);
+          showToast("Import dữ liệu thành công", "success");
         };
         reader.readAsArrayBuffer(file);
       } catch (error) {
@@ -273,7 +315,7 @@ const Stores = () => {
       Address: store.address || "N/A",
       Phone: store.phone || "N/A",
       "Owner Name": store.ownerId?.name || "N/A",
-      Status: store.status === "1" ? "Active" : "Inactive",
+      Status: store.status === "ACTIVE" ? "Active" : "Inactive",
       "Open Time": store.openTime || "N/A",
       "Close Time": store.closeTime || "N/A",
       "Created At": store.createdAt || "N/A",
@@ -287,12 +329,18 @@ const Stores = () => {
   };
 
   const filteredData = storesData.filter((store) =>
-    (store.name || "").toLowerCase().includes(searchInput.toLowerCase())  
- 
+    (
+      (store.name || "") +
+      (store.description || "") +
+      (store.address || "") +
+      (store.ownerId?.name || "")
+    )
+      .toLowerCase()
+      .includes(searchInput.toLowerCase())
   );
 
   return (
-    <>
+    <Suspense fallback={<Loading />}>
       <section>
         <div>
           <header className="bg-white rounded-md p-4 flex items-center justify-between shadow-md">
@@ -310,8 +358,8 @@ const Stores = () => {
                 Icon={CiSearch}
                 iconSize={24}
                 iconStyle="transition-all text-[#435d63] hover:text-black mx-4"
-                hasError={errors?.searchInput}
-                errorMessage={errors?.searchInput}
+                hasError={!!errors.searchInput}
+                errorMessage={errors.searchInput}
               />
             </div>
 
@@ -332,7 +380,7 @@ const Stores = () => {
                       setShowForm(true);
                     }}
                   >
-                   Create
+                    Create
                   </button>
                   <button
                     className="p-2 px-4 hover:bg-black/10 w-full"
@@ -375,7 +423,7 @@ const Stores = () => {
                   />
                 }
                 columns={columns}
-                data={filteredData} 
+                data={filteredData}
                 selectableRowsComponent={SelectBox}
                 selectableRowsComponentProps={{
                   style: {
@@ -416,13 +464,13 @@ const Stores = () => {
         onOk={confirmDeleteSingle}
         onCancel={() => setShowConfirmDeleteSingle(false)}
         title="Are you sure you want to delete this?"
-        message="This action can be undone"
+        message="This action cannot be undone"
         okButtonText="OK"
         cancelButtonText="Cancel"
       />
 
       <ToastContainer />
-    </>
+    </Suspense>
   );
 };
 

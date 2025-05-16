@@ -6,7 +6,9 @@ import j2ee.j2ee.apps.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -31,7 +33,8 @@ public class StoreService {
                 .description(entity.getDescription())
                 .address(entity.getAddress())
                 .phone(entity.getPhone())
-                .image(entity.getImage())
+
+
                 .createdAt(formatDateTime(entity.getCreated_at()))
                 .updatedAt(formatDateTime(entity.getUpdated_at()))
                 .openTime(formatTime(entity.getOpen_time()))
@@ -59,7 +62,7 @@ public class StoreService {
         entity.setDescription(dto.getDescription());
         entity.setAddress(dto.getAddress());
         entity.setPhone(dto.getPhone());
-        entity.setImage(dto.getImage());
+
         entity.setCreated_at(parseDateTime(dto.getCreatedAt(), LocalDateTime.now()));
         entity.setUpdated_at(parseDateTime(dto.getUpdatedAt(), LocalDateTime.now()));
         entity.setOpen_time(parseTime(dto.getOpenTime()));
@@ -101,12 +104,21 @@ public class StoreService {
             return null;
         }
     }
+    public StoreEntity getStore(long id) {
+        return storeRepository.findById(id).orElse(null);
+    }
 
     @Transactional
-    public StoreDTO createStore(StoreDTO storeDTO) {
+    public StoreDTO createStore(StoreDTO storeDTO, MultipartFile multipartFile) throws IOException {
+
         StoreEntity entity = toEntity(storeDTO);
         entity.setCreated_at(LocalDateTime.now());
         entity.setUpdated_at(LocalDateTime.now());
+        entity.setImageName(multipartFile.getOriginalFilename());
+        entity.setImageType(multipartFile.getContentType());
+        entity.setImage(multipartFile.getBytes());
+
+
         StoreEntity saved = storeRepository.save(entity);
         return toDTO(saved);
     }
@@ -124,7 +136,7 @@ public class StoreService {
     }
 
     @Transactional
-    public StoreDTO updateStore(Long id, StoreDTO storeDTO) {
+    public StoreDTO updateStore(Long id, StoreDTO storeDTO,MultipartFile multipartFile) throws RuntimeException, IOException {
         StoreEntity entity = storeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy store với ID: " + id));
 
@@ -132,7 +144,7 @@ public class StoreService {
         entity.setDescription(storeDTO.getDescription());
         entity.setAddress(storeDTO.getAddress());
         entity.setPhone(storeDTO.getPhone());
-        entity.setImage(storeDTO.getImage());
+
         entity.setOpen_time(parseTime(storeDTO.getOpenTime()));
         entity.setClose_time(parseTime(storeDTO.getCloseTime()));
         entity.setStatus(storeDTO.getStatus());
@@ -142,7 +154,11 @@ public class StoreService {
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy user với ID: " + storeDTO.getOwnerId().getId()));
             entity.setOwner(owner);
         }
-
+     if (multipartFile != null && !multipartFile.isEmpty()) {
+        entity.setImageName(multipartFile.getOriginalFilename());
+        entity.setImageType(multipartFile.getContentType());
+        entity.setImage(multipartFile.getBytes());
+    }
         entity.setUpdated_at(LocalDateTime.now());
         StoreEntity updated = storeRepository.save(entity);
         return toDTO(updated);
